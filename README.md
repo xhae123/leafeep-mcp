@@ -1,8 +1,8 @@
 # leafeep-mcp
 
-Claude Code에서 [Leafeep](https://leafeep.com) 시험을 만들고 관리하는 MCP 서버.
+MCP server for creating and managing [Leafeep](https://leafeep.com) exams from Claude Code.
 
-## 설치
+## Installation
 
 ```bash
 npm install -g github:xhae123/leafeep-mcp
@@ -12,15 +12,15 @@ claude mcp add leafeep -s user npx leafeep-mcp \
   -e LEAFEEP_FRONTEND_URL=https://leafeep.com
 ```
 
-API Key는 [leafeep.com](https://leafeep.com) 대시보드에서 발급.
+Get your API key from the [leafeep.com](https://leafeep.com) dashboard.
 
-## 도구
+## Tools
 
-| 도구 | 설명 |
+| Tool | Description |
 |---|---|
-| `create_exam` | 문제 세트 생성 + 학생 링크 발급 |
-| `list_exams` | 문제 세트 목록 |
-| `get_results` | 제출 현황 + 채점 데이터 (JSON) |
-| `close_exam` | 시험 마감 |
-| `list_students` | 학생 목록 + 평균 점수 |
-| `get_student_history` | 학생별 전체 시험 이력 |
+| `create_exam` | Create a question set and generate student links |
+| `list_exams` | List all question sets |
+| `get_results` | Get submission status and grading data (JSON) |
+| `close_exam` | Close an exam |
+| `list_students` | List students with average scores |
+| `get_student_history` | Get full exam history for a student |
