@@ -26,7 +26,8 @@ async function api(path, options = {}) {
 }
 const server = new McpServer({
     name: "leafeep",
-    version: "0.1.0",
+    version: "0.2.0",
+    description: "Quiz distribution & grading for coding instructors. You can: create exams from questions, share links with students, grade submissions (correct/incorrect/partial + comments), track student performance, and analyze results — all from the terminal.",
 });
 server.tool("create_exam", "문제 세트를 생성하고 학생 공유 링크를 발급합니다. questions 배열에 문제를 넣으면 즉시 링크가 나옵니다.", {
     title: z.string().describe("세트 제목 (예: '5/16 파이썬 리스트 복습')"),
@@ -190,6 +191,33 @@ server.tool("close_exam", "시험을 마감합니다 (제출 잠금). 마감 후
             {
                 type: "text",
                 text: `🔒 시험이 마감되었습니다. 더 이상 학생이 제출할 수 없습니다.`,
+            },
+        ],
+    };
+});
+server.tool("grade_exam", `시험을 채점합니다. get_results로 가져온 grading 데이터의 answerId를 사용하세요.
+각 답안에 대해 result(correct/incorrect/partial), score(배점 이하 정수), comment(선택)를 지정합니다.
+한 번에 여러 답안을 채점할 수 있습니다. 이미 채점된 답안도 덮어씁니다.`, {
+    exam_id: z.number().describe("시험 ID"),
+    grades: z.array(z.object({
+        answerId: z.number().describe("답안 ID (grading.studentAnswers[].answerId)"),
+        result: z.enum(["correct", "incorrect", "partial"]).describe("채점 결과"),
+        score: z.number().describe("부여할 점수 (0 ~ 해당 문제 배점)"),
+        comment: z.string().optional().describe("코멘트 (선택)"),
+    })),
+}, async ({ exam_id, grades }) => {
+    await api(`/api/instructor/exams/${exam_id}/grading`, {
+        method: "PUT",
+        body: JSON.stringify({ grades }),
+    });
+    const correct = grades.filter((g) => g.result === "correct").length;
+    const incorrect = grades.filter((g) => g.result === "incorrect").length;
+    const partial = grades.filter((g) => g.result === "partial").length;
+    return {
+        content: [
+            {
+                type: "text",
+                text: `채점 완료: ${grades.length}건 저장 (정답 ${correct}, 오답 ${incorrect}, 부분 정답 ${partial})`,
             },
         ],
     };

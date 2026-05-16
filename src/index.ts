@@ -128,7 +128,8 @@ interface ResultsResponse {
 
 const server = new McpServer({
   name: "leafeep",
-  version: "0.1.0",
+  version: "0.2.0",
+  description: "Quiz distribution & grading for coding instructors. You can: create exams from questions, share links with students, grade submissions (correct/incorrect/partial + comments), track student performance, and analyze results — all from the terminal.",
 });
 
 server.tool(
@@ -347,6 +348,43 @@ server.tool(
         {
           type: "text" as const,
           text: `🔒 시험이 마감되었습니다. 더 이상 학생이 제출할 수 없습니다.`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "grade_exam",
+  `시험을 채점합니다. get_results로 가져온 grading 데이터의 answerId를 사용하세요.
+각 답안에 대해 result(correct/incorrect/partial), score(배점 이하 정수), comment(선택)를 지정합니다.
+한 번에 여러 답안을 채점할 수 있습니다. 이미 채점된 답안도 덮어씁니다.`,
+  {
+    exam_id: z.number().describe("시험 ID"),
+    grades: z.array(
+      z.object({
+        answerId: z.number().describe("답안 ID (grading.studentAnswers[].answerId)"),
+        result: z.enum(["correct", "incorrect", "partial"]).describe("채점 결과"),
+        score: z.number().describe("부여할 점수 (0 ~ 해당 문제 배점)"),
+        comment: z.string().optional().describe("코멘트 (선택)"),
+      })
+    ),
+  },
+  async ({ exam_id, grades }) => {
+    await api(`/api/instructor/exams/${exam_id}/grading`, {
+      method: "PUT",
+      body: JSON.stringify({ grades }),
+    });
+
+    const correct = grades.filter((g) => g.result === "correct").length;
+    const incorrect = grades.filter((g) => g.result === "incorrect").length;
+    const partial = grades.filter((g) => g.result === "partial").length;
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `채점 완료: ${grades.length}건 저장 (정답 ${correct}, 오답 ${incorrect}, 부분 정답 ${partial})`,
         },
       ],
     };
