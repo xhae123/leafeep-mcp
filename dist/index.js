@@ -8,7 +8,7 @@ const FRONTEND_URL = process.env.LEAFEEP_FRONTEND_URL ?? "https://leafeep.com";
 const API_KEY = process.env.LEAFEEP_API_KEY ?? "";
 async function api(path, options = {}) {
     if (!API_KEY) {
-        throw new Error("LEAFEEP_API_KEY가 설정되지 않았습니다. 환경변수를 확인하세요.");
+        throw new Error("LEAFEEP_API_KEY is not set. Get your free API key at https://leafeep.com → Log in → Claude Integration.");
     }
     const res = await fetch(`${API_BASE}${path}`, {
         ...options,
