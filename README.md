@@ -1,26 +1,45 @@
 # leafeep-mcp
 
-MCP server for creating and managing [Leafeep](https://leafeep.com) exams from Claude Code.
+MCP server for [Leafeep](https://leafeep.com) — create, distribute, grade, and analyze exams from Claude.
 
-## Installation
+## Setup
+
+### 1. Get your API key
+
+1. Go to [leafeep.com](https://leafeep.com) and log in with Google
+2. Click **Claude Integration** on the dashboard
+3. Your API key and install command will be generated automatically — just copy and paste
+
+### 2. Install
 
 ```bash
 npm install -g github:xhae123/leafeep-mcp
-claude mcp add leafeep -s user npx leafeep-mcp \
-  -e LEAFEEP_API_KEY=lfp_... \
+```
+
+### 3. Register with Claude
+
+```bash
+claude mcp add leafeep -s user -- npx leafeep-mcp \
+  -e LEAFEEP_API_KEY=lfp_your_key_here \
   -e LEAFEEP_API_URL=https://api.leafeep.com \
   -e LEAFEEP_FRONTEND_URL=https://leafeep.com
 ```
 
-Get your API key from the [leafeep.com](https://leafeep.com) dashboard.
+> **Tip:** The dashboard generates this command with your API key pre-filled. Just copy and paste.
 
-## Tools
+## What you can do
 
-| Tool | Description |
-|---|---|
-| `create_exam` | Create a question set and generate student links |
-| `list_exams` | List all question sets |
-| `get_results` | Get submission status and grading data (JSON) |
-| `close_exam` | Close an exam |
-| `list_students` | List students with average scores |
-| `get_student_history` | Get full exam history for a student |
+| Tool | What it does | Example |
+|---|---|---|
+| `create_exam` | Create questions + student link | "Make 5 Python list questions" |
+| `grade_exam` | Grade student submissions | "Grade the exam and summarize" |
+| `get_results` | Get full submission + grading data | "Show exam results" |
+| `list_exams` | List your question sets | "Show my exams" |
+| `close_exam` | Close submissions | "Close the exam" |
+| `list_students` | Student list with scores | "Show all students" |
+| `get_student_history` | Full history for a student | "Analyze weak points for Kim" |
+
+## Links
+
+- **Web:** [leafeep.com](https://leafeep.com)
+- **API limit:** 1,000 calls/day (free)
