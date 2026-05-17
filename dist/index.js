@@ -3,7 +3,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import QRCode from "qrcode";
-import { createServer } from "http";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
@@ -30,7 +29,7 @@ function getAuthHeaders() {
         return { "X-API-Key": API_KEY };
     if (authToken)
         return { Authorization: `Bearer ${authToken}` };
-    throw new Error("Not authenticated. Use the setup tool to log in.");
+    throw new Error("Not logged in. Run the 'setup' tool first, then paste your token with the 'verify' tool.");
 }
 async function api(path, options = {}) {
     const headers = getAuthHeaders();
@@ -48,44 +47,12 @@ async function api(path, options = {}) {
     }
     return res.json();
 }
-function waitForLogin(port) {
-    return new Promise((resolve, reject) => {
-        const server = createServer((req, res) => {
-            const url = new URL(req.url ?? "", `http://localhost:${port}`);
-            if (url.pathname === "/callback") {
-                const token = url.searchParams.get("token");
-                if (token) {
-                    res.writeHead(200, {
-                        "Content-Type": "text/html",
-                        "Access-Control-Allow-Origin": "*",
-                    });
-                    res.end("<html><body><h2>Connected! You can close this tab.</h2></body></html>");
-                    server.close();
-                    resolve(token);
-                }
-                else {
-                    res.writeHead(400);
-                    res.end("Missing token");
-                }
-            }
-            else {
-                res.writeHead(404);
-                res.end();
-            }
-        });
-        server.listen(port, () => { });
-        setTimeout(() => {
-            server.close();
-            reject(new Error("Login timed out after 5 minutes"));
-        }, 300_000);
-    });
-}
 const server = new McpServer({
     name: "leafeep",
     version: "0.3.0",
-    description: "Quiz distribution & grading for coding instructors. You can: create exams from questions, share links with students, grade submissions (correct/incorrect/partial + comments), track student performance, and analyze results — all from Claude.",
+    description: "Quiz distribution & grading for coding instructors. You can: create exams, share links with students, grade submissions, track student performance, and analyze results — all from Claude.",
 });
-server.tool("setup", "Log in to Leafeep. Run this if you get authentication errors. Opens a login link — click it to connect your Google account.", {}, async () => {
+server.tool("setup", "Get the login link for Leafeep. After logging in, copy the token shown on the page and use the 'verify' tool to connect.", {}, async () => {
     if (API_KEY) {
         return { content: [{ type: "text", text: "Already authenticated with API key." }] };
     }
@@ -98,43 +65,42 @@ server.tool("setup", "Log in to Leafeep. Run this if you get authentication erro
             authToken = null;
         }
     }
-    const port = 19823 + Math.floor(Math.random() * 100);
-    const loginUrl = `${FRONTEND_URL}/mcp-setup?port=${port}`;
-    const tokenPromise = waitForLogin(port);
+    const loginUrl = `${FRONTEND_URL}/mcp-setup`;
     return {
-        content: [
-            {
+        content: [{
                 type: "text",
                 text: [
-                    "🔗 Leafeep login required.",
-                    "",
-                    "Open this link in your browser and log in with Google:",
-                    "",
+                    `Open this link and log in with Google:`,
+                    ``,
                     loginUrl,
-                    "",
-                    "Waiting for login... (times out in 5 minutes)",
+                    ``,
+                    `After login, a token will be shown on the page.`,
+                    `Copy it and run: verify <token>`,
                 ].join("\n"),
-            },
-        ],
-        _meta: {
-            afterResponse: async () => {
-                try {
-                    const token = await tokenPromise;
-                    authToken = token;
-                    saveToken(token);
-                }
-                catch { }
-            },
-        },
+            }],
     };
 });
-server.tool("create_exam", "Create a question set and generate a student link. Provide questions and get a shareable link + QR code instantly.", {
-    title: z.string().describe("Set title (e.g., '5/16 Python List Review')"),
+server.tool("verify", "Paste the token from the login page to connect your account. Usage: verify <token>", {
+    token: z.string().describe("The token shown on the login page after Google sign-in"),
+}, async ({ token }) => {
+    authToken = token;
+    try {
+        await api("/api/auth/me");
+        saveToken(token);
+        return { content: [{ type: "text", text: "✓ Connected! You can now use all Leafeep tools." }] };
+    }
+    catch {
+        authToken = null;
+        return { content: [{ type: "text", text: "✗ Invalid token. Please try logging in again." }] };
+    }
+});
+server.tool("create_exam", "Create a question set and generate a student link + QR code.", {
+    title: z.string().describe("Set title"),
     questions: z.array(z.object({
         type: z.enum(["multiple_choice", "short_answer", "long_answer"]).describe("Question type"),
         question: z.string().describe("Question text"),
         code: z.string().optional().describe("Code block (optional)"),
-        choices: z.array(z.string()).optional().describe("Multiple choice options (required for multiple_choice)"),
+        choices: z.array(z.string()).optional().describe("Choices (required for multiple_choice)"),
         answer: z.string().describe("Correct answer"),
         score: z.number().describe("Points"),
     })),
@@ -164,16 +130,12 @@ server.tool("create_exam", "Create a question set and generate a student link. P
 });
 server.tool("list_exams", "List all your question sets.", {}, async () => {
     const sets = await api("/api/instructor/question-sets");
-    if (sets.length === 0) {
+    if (sets.length === 0)
         return { content: [{ type: "text", text: "No question sets yet." }] };
-    }
     const lines = sets.map((s) => `- [${s.id}] ${s.title} (${s.questionCount} questions, ${s.createdAt.slice(0, 10)})`);
-    return {
-        content: [{ type: "text", text: [`Question sets (${sets.length}):`, "", ...lines].join("\n") }],
-    };
+    return { content: [{ type: "text", text: [`Question sets (${sets.length}):`, "", ...lines].join("\n") }] };
 });
-server.tool("get_results", `Get full exam data: submissions, per-question student answers, grading results, and statistics.
-Use this data for error pattern analysis, student weakness identification, and class feedback.`, { exam_id: z.number().describe("Exam ID (from create_exam)") }, async ({ exam_id }) => {
+server.tool("get_results", "Get full exam data: submissions, answers, grading, and statistics.", { exam_id: z.number().describe("Exam ID") }, async ({ exam_id }) => {
     const exam = await api(`/api/instructor/exams/${exam_id}`);
     const submissions = await api(`/api/instructor/exams/${exam_id}/submissions`);
     let grading = null;
@@ -188,37 +150,36 @@ Use this data for error pattern analysis, student weakness identification, and c
     catch { }
     const data = {
         exam: { id: exam.id, code: exam.code, title: exam.questionSetTitle, status: exam.status, totalSubmissions: exam.totalSubmissions, submittedCount: exam.submittedCount, createdAt: exam.createdAt, closedAt: exam.closedAt },
-        submissions: submissions.map((s) => ({ id: s.id, studentName: s.studentName, status: s.status, createdAt: s.createdAt, submittedAt: s.submittedAt, answers: s.answers })),
-        grading: grading ? grading.questions.map((q) => ({ questionId: q.questionId, orderIndex: q.orderIndex, type: q.type, question: q.question, code: q.code, correctAnswer: q.correctAnswer, maxScore: q.score, studentAnswers: q.studentAnswers.map((sa) => ({ studentName: sa.studentName, answerText: sa.answerText, grade: sa.grade ? { score: sa.grade.score, result: sa.grade.result, comment: sa.grade.comment } : null })) })) : null,
-        results: results ? { students: results.students.map((s) => ({ studentName: s.studentName, status: s.status, totalScore: s.totalScore, maxScore: s.maxScore, scores: s.scores })), questionStats: results.questionStats.map((q) => ({ questionIndex: q.questionIndex, question: q.question, correctRate: q.correctRate, avgScore: q.avgScore, maxScore: q.maxScore })) } : null,
+        submissions: submissions.map((s) => ({ id: s.id, studentName: s.studentName, status: s.status, submittedAt: s.submittedAt, answers: s.answers })),
+        grading: grading ? grading.questions.map((q) => ({ questionId: q.questionId, question: q.question, correctAnswer: q.correctAnswer, maxScore: q.score, studentAnswers: q.studentAnswers.map((sa) => ({ studentName: sa.studentName, answerText: sa.answerText, grade: sa.grade ? { score: sa.grade.score, result: sa.grade.result, comment: sa.grade.comment } : null })) })) : null,
+        results: results ? { students: results.students, questionStats: results.questionStats } : null,
     };
     return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 });
-server.tool("close_exam", "Close an exam (lock submissions). Students can no longer submit after this.", { exam_id: z.number().describe("Exam ID") }, async ({ exam_id }) => {
+server.tool("close_exam", "Close an exam (lock submissions).", { exam_id: z.number().describe("Exam ID") }, async ({ exam_id }) => {
     await api(`/api/instructor/exams/${exam_id}/close`, { method: "PUT" });
-    return { content: [{ type: "text", text: "Exam closed. Students can no longer submit." }] };
+    return { content: [{ type: "text", text: "Exam closed." }] };
 });
-server.tool("grade_exam", `Grade student submissions. Use answerId from get_results grading data.
-Set result (correct/incorrect/partial), score, and optional comment for each answer.`, {
+server.tool("grade_exam", "Grade student submissions. Use answerId from get_results.", {
     exam_id: z.number().describe("Exam ID"),
     grades: z.array(z.object({
-        answerId: z.number().describe("Answer ID (from grading.studentAnswers[].answerId)"),
+        answerId: z.number().describe("Answer ID"),
         result: z.enum(["correct", "incorrect", "partial"]).describe("Grade result"),
-        score: z.number().describe("Score (0 to max question score)"),
+        score: z.number().describe("Score"),
         comment: z.string().optional().describe("Comment (optional)"),
     })),
 }, async ({ exam_id, grades }) => {
     await api(`/api/instructor/exams/${exam_id}/grading`, { method: "PUT", body: JSON.stringify({ grades }) });
-    const correct = grades.filter((g) => g.result === "correct").length;
-    const incorrect = grades.filter((g) => g.result === "incorrect").length;
-    const partial = grades.filter((g) => g.result === "partial").length;
-    return { content: [{ type: "text", text: `Graded: ${grades.length} answers (${correct} correct, ${incorrect} incorrect, ${partial} partial)` }] };
+    const c = grades.filter((g) => g.result === "correct").length;
+    const i = grades.filter((g) => g.result === "incorrect").length;
+    const p = grades.filter((g) => g.result === "partial").length;
+    return { content: [{ type: "text", text: `Graded ${grades.length} answers (${c} correct, ${i} incorrect, ${p} partial)` }] };
 });
-server.tool("list_students", "List all students who have taken your exams, with exam count, graded count, and average score.", {}, async () => {
+server.tool("list_students", "List all students with scores.", {}, async () => {
     const students = await api("/api/instructor/students");
     return { content: [{ type: "text", text: JSON.stringify(students, null, 2) }] };
 });
-server.tool("get_student_history", "Get a student's full exam history: scores, answers, grades, and per-question details. Use for weakness analysis and learning trend tracking.", { student_name: z.string().describe("Student name (from list_students)") }, async ({ student_name }) => {
+server.tool("get_student_history", "Get a student's full exam history for weakness analysis.", { student_name: z.string().describe("Student name") }, async ({ student_name }) => {
     const history = await api(`/api/instructor/students/${encodeURIComponent(student_name)}`);
     return { content: [{ type: "text", text: JSON.stringify(history, null, 2) }] };
 });
