@@ -5,16 +5,18 @@ MCP server for [Leafeep](https://leafeep.com) — create, distribute, grade, and
 ## Quick Start
 
 ```bash
-claude mcp add leafeep -s user -- npx leafeep-mcp
+npm install -g github:xhae123/leafeep-mcp
+claude mcp add leafeep -s user -- leafeep-mcp
 ```
 
-That's it. On first use, Claude will show a login link — click it to connect your Google account.
+On first use, Claude will show a login link — open it, log in with Google, copy the token, and paste it back into Claude.
 
 ## What you can do
 
 | Tool | What it does | Example |
 |---|---|---|
-| `setup` | Log in to Leafeep | "Connect to Leafeep" |
+| `setup` | Get login link | "Connect to Leafeep" |
+| `verify` | Paste token to connect | (paste token from login page) |
 | `create_exam` | Create questions + student link | "Make 5 Python list questions" |
 | `grade_exam` | Grade student submissions | "Grade the exam and summarize" |
 | `get_results` | Get full submission + grading data | "Show exam results" |
@@ -28,7 +30,7 @@ That's it. On first use, Claude will show a login link — click it to connect y
 If you prefer using an API key instead of browser login, get one from [leafeep.com](https://leafeep.com) → Claude Integration, then:
 
 ```bash
-claude mcp add leafeep -s user -- npx leafeep-mcp -e LEAFEEP_API_KEY=lfp_your_key
+claude mcp add leafeep -s user -- leafeep-mcp -e LEAFEEP_API_KEY=lfp_your_key
 ```
 
 ## Links

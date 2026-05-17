@@ -5,7 +5,8 @@ Claude Code / Codex에서 Leafeep을 사용하기 위한 MCP 서버.
 ## 설치
 
 ```bash
-claude mcp add leafeep -s user -- npx leafeep-mcp
+npm install -g github:xhae123/leafeep-mcp
+claude mcp add leafeep -s user -- leafeep-mcp
 ```
 
 ## 인증
