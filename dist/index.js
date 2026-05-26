@@ -175,6 +175,25 @@ server.tool("grade_exam", "Grade student submissions. Use answerId from get_resu
     const p = grades.filter((g) => g.result === "partial").length;
     return { content: [{ type: "text", text: `Graded ${grades.length} answers (${c} correct, ${i} incorrect, ${p} partial)` }] };
 });
+server.tool("bulk_create_review_questions", "Bulk create OX review questions for the review pool. Each question needs a statement, correctAnswer (true/false), and tags (from ConceptTag).", {
+    questions: z.array(z.object({
+        statement: z.string().describe("OX statement (e.g. 'x²+5x+6=0 의 근은 x=-2, x=-3 이다')"),
+        correctAnswer: z.boolean().describe("true if the statement is correct, false otherwise"),
+        tags: z.array(z.string()).describe("Concept tags from the tag pool (e.g. ['quadratic_equations', 'factoring'])"),
+    })),
+}, async ({ questions }) => {
+    const result = await api("/api/instructor/review-questions/bulk", { method: "POST", body: JSON.stringify({ questions }) });
+    return {
+        content: [{
+                type: "text",
+                text: `Created ${result.created} review questions (${result.skipped} skipped)${result.errors.length > 0 ? `\nErrors:\n${result.errors.join("\n")}` : ""}`,
+            }],
+    };
+});
+server.tool("get_review_pool_stats", "Get statistics about the review question pool coverage.", {}, async () => {
+    const stats = await api("/api/instructor/review-questions/stats");
+    return { content: [{ type: "text", text: JSON.stringify(stats, null, 2) }] };
+});
 server.tool("list_students", "List all students with scores.", {}, async () => {
     const students = await api("/api/instructor/students");
     return { content: [{ type: "text", text: JSON.stringify(students, null, 2) }] };
